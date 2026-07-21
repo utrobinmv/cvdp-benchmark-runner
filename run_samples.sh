@@ -39,6 +39,22 @@ echo "============================================"
 
 cp "${FACTORY_FILE}" "${BENCHMARK_DIR}/custom_factory.py"
 
+# Резолвим относительные пути в абсолютные (до смены директории)
+RESOLVED_ARGS=()
+PREV_ARG=""
+for arg in "$@"; do
+    if [ "${PREV_ARG}" = "-f" ] || [ "${PREV_ARG}" = "--filename" ] || \
+       [ "${PREV_ARG}" = "-a" ] || [ "${PREV_ARG}" = "--answers" ]; then
+        if [ -f "$arg" ]; then
+            arg="$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")"
+        elif [ -f "${SCRIPT_DIR}/$arg" ]; then
+            arg="${SCRIPT_DIR}/$arg"
+        fi
+    fi
+    RESOLVED_ARGS+=("$arg")
+    PREV_ARG="$arg"
+done
+
 cd "${BENCHMARK_DIR}"
 export PYTHONPATH="${BENCHMARK_DIR}:${PYTHONPATH:-}"
 
@@ -46,4 +62,4 @@ exec python3 run_samples.py \
     -l \
     -m "${MODEL}" \
     -c "${BENCHMARK_DIR}/custom_factory.py" \
-    "$@"
+    "${RESOLVED_ARGS[@]}"

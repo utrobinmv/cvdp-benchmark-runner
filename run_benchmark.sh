@@ -11,16 +11,16 @@
 #
 # ПРИМЕРЫ:
 #   # Полный бенчмарк:
-#   ./run_benchmark.sh -f dataset.jsonl
+#   ./run_benchmark.sh -f datasets/your_dataset.jsonl
 #
 #   # Один тестовый кейс:
-#   ./run_benchmark.sh -f dataset.jsonl -i cvdp_copilot_test_issue_0001
+#   ./run_benchmark.sh -f datasets/your_dataset.jsonl -i cvdp_copilot_test_issue_0001
 #
 #   # Золотые решения (без LLM):
-#   ./run_benchmark.sh -f dataset_with_solutions.jsonl
+#   ./run_benchmark.sh -f datasets/dataset_with_solutions.jsonl
 #
 #   # Несколько сэмплов (pass@k):
-#   ./run_benchmark.sh -f dataset.jsonl --samples -n 5 -k 1
+#   ./run_samples.sh -f datasets/your_dataset.jsonl -n 5 -k 1
 
 set -euo pipefail
 
@@ -66,6 +66,22 @@ echo "============================================"
 # Копируем фабрику в директорию бенчмарка для корректных импортов
 cp "${FACTORY_FILE}" "${BENCHMARK_DIR}/custom_factory.py"
 
+# Резолвим относительные пути в абсолютные (до смены директории)
+RESOLVED_ARGS=()
+PREV_ARG=""
+for arg in "$@"; do
+    if [ "${PREV_ARG}" = "-f" ] || [ "${PREV_ARG}" = "--filename" ] || \
+       [ "${PREV_ARG}" = "-a" ] || [ "${PREV_ARG}" = "--answers" ]; then
+        if [ -f "$arg" ]; then
+            arg="$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")"
+        elif [ -f "${SCRIPT_DIR}/$arg" ]; then
+            arg="${SCRIPT_DIR}/$arg"
+        fi
+    fi
+    RESOLVED_ARGS+=("$arg")
+    PREV_ARG="$arg"
+done
+
 # Передаём аргументы
 cd "${BENCHMARK_DIR}"
 export PYTHONPATH="${BENCHMARK_DIR}:${PYTHONPATH:-}"
@@ -74,4 +90,4 @@ exec python3 run_benchmark.py \
     -l \
     -m "${MODEL}" \
     -c "${BENCHMARK_DIR}/custom_factory.py" \
-    "$@"
+    "${RESOLVED_ARGS[@]}"
