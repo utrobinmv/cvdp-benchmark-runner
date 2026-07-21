@@ -71,6 +71,7 @@ cvdp-benchmark-runner/
 ├── custom_factory.py         # Кастомная ModelFactory для OpenAI-compatible API
 ├── run_benchmark.sh          # Скрипт запуска бенчмарка
 ├── run_samples.sh            # Скрипт запуска multi-sample (pass@k)
+├── save_report.sh            # Сохранение отчёта в хранилище
 ├── cvdp_benchmark/           # Git submodule -- оригинальный репозиторий
 ├── README.md
 ├── INSTALL.md
@@ -105,3 +106,59 @@ cvdp-benchmark-runner/
 - `report.json` -- структурированный отчёт
 - `report.txt` -- читаемый отчёт
 - `run.log` -- лог выполнения
+
+### Хранилище отчётов
+
+Для сравнения моделей результаты сохраняются в `~/workspace/data/cvdp-benchmark-runner/reports/`:
+
+```bash
+# Сохранение отчёта после бенчмарка
+./save_report.sh work_<prefix> "<model_name>"
+```
+
+Создаёт директорию `YYYY-MM-DD_<model_name>/` со всеми файлами отчёта и `summary.json` -- сжатые метрики для сравнения.
+
+Пример структуры:
+
+```
+reports/
+├── 2026-07-21_gemma-4-12B-it-qat-w4a16-ct/
+│   ├── report.txt
+│   ├── report.json
+│   ├── raw_result.json
+│   ├── prompt_response.jsonl
+│   ├── run.log
+│   ├── benchmark.log
+│   └── summary.json
+└── 2026-07-22_another_model/
+    └── ...
+```
+
+### Сравнение моделей
+
+```bash
+# Быстрый просмотр pass rate всех моделей
+for d in ~/workspace/data/cvdp-benchmark-runner/reports/*/summary.json; do
+    python3 -c "
+import json
+with open('$d') as f:
+    s = json.load(f)
+print(f'{s[\"model\"]:50s} easy={s[\"by_difficulty\"].get(\"easy\",{}).get(\"pass_rate\",\"N/A\")}%  medium={s[\"by_difficulty\"].get(\"medium\",{}).get(\"pass_rate\",\"N/A\")}%  total={s[\"overall\"][\"problem_pass_rate\"]}%')
+"
+done
+```
+
+### Результаты gemma-4-12B-it-qat-w4a16-ct
+
+| Метрика | Значение |
+|---------|----------|
+| Problem Pass Rate | 18.54% (56/302) |
+| Test Pass Rate | 22.58% (77/341) |
+| Easy Pass Rate | 25.93% (42/162) |
+| Medium Pass Rate | 10.00% (14/140) |
+
+**Основные ошибки:**
+
+- **Синтаксические (36 задач)** -- неопределённые сигналы, дублирующиеся assign, ошибки модулей. Иверлог не смог скомпилировать код.
+- **Логические (47 задач)** -- код скомпилировался, но симуляция показала неправильные результаты (ошибки в алгоритмах, неинициализированные сигналы).
+- **Таймауты (22 задачи)** -- бесконечные циклы, потеря синхронизации в асинхронных задачах.
