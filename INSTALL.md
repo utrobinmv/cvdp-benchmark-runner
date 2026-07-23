@@ -11,7 +11,7 @@
 ### 1. Клонирование репозитория
 
 ```bash
-git clone <repo_url> cvdp-benchmark-runner
+git clone https://github.com/utrobinmv/cvdp-benchmark-runner.git
 cd cvdp-benchmark-runner
 ```
 
@@ -67,24 +67,38 @@ cd ..
 
 ### 6. Настройка модели (файл .env)
 
-Файл `.env` уже создан с параметрами по умолчанию:
+Скопируйте `.env.example` в `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Файл `.env`:
 
 ```
-BASE_URL=http://192.168.45.10:30070/v1
+BASE_URL=http://192.168.45.10:30000/v1
 API_KEY=any_key
-MODEL=gemma-4-12B-it-qat-w4a16-ct
+MODEL=/mnt/extendet_data/models/Qwen3.6-27B-FP8
+# Таймаут ответа модели в секундах. По умолчанию 60 -- слишком мало для больших моделей.
+# Рекомендуется минимум 600 для моделей 27B+ и 300 для моделей 12B.
+MODEL_TIMEOUT=600
 ```
 
 Измените при необходимости. Файл `.env` попадает в `.gitignore` и не коммитится.
 
+**Важно:** `MODEL_TIMEOUT` задаётся только в `.env`. Передача через переменную окружения перед запуском (например `MODEL_TIMEOUT=1200 ./run_benchmark.sh`) не работает -- скрипт перезагружает `.env` и перезаписывает значение.
+
 ### 7. Скачивание датасета
 
 ```bash
-# Установка huggingface-cli
+# Установка huggingface_hub (если ещё не установлен)
 pip install huggingface_hub
 
-# Скачивание датасета
-huggingface-cli download nvidia/cvdp-benchmark-dataset --local-dir ./datasets
+# Скачивание датасета (huggingface_hub >= 1.0)
+hf download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets
+
+# Для старых версий huggingface_hub (< 1.0)
+huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets
 ```
 
 Или скачайте вручную с [Hugging Face](https://huggingface.co/datasets/nvidia/cvdp-benchmark-dataset).

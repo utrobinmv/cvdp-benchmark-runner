@@ -53,8 +53,11 @@ MODEL_TIMEOUT=600
 Датасет CVDP доступен на Hugging Face: [nvidia/cvdp-benchmark-dataset](https://huggingface.co/datasets/nvidia/cvdp-benchmark-dataset)
 
 ```bash
-# Пример скачивания примера
-huggingface-cli download nvidia/cvdp-benchmark-dataset --local-dir ./datasets
+# Скачивание датасета (huggingface_hub >= 1.0)
+hf download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets
+
+# Для старых версий huggingface_hub (< 1.0)
+huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets
 ```
 
 ### 5. Запуск
