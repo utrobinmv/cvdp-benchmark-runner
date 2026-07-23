@@ -31,7 +31,7 @@ ls cvdp_benchmark/src/
 
 ```bash
 # Привязка версии Python через pyenv
-pyenv local 3.12.0
+pyenv local 3.12
 
 # Создание виртуального окружения
 python -m venv ~/workspace/venvs/cvdp-benchmark-runner/default/
@@ -120,7 +120,7 @@ rm -rf ~/workspace/venvs/cvdp-benchmark-runner/
 git submodule update --init --recursive
 
 # 3. Создать venv заново
-pyenv local 3.12.0
+pyenv local 3.12
 python -m venv ~/workspace/venvs/cvdp-benchmark-runner/default/
 source .venv
 pip install -r cvdp_benchmark/requirements.txt
