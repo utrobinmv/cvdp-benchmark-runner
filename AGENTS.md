@@ -6,7 +6,8 @@
 - `custom_factory.py` -- кастомная ModelFactory для OpenAI-compatible API
 - `run_benchmark.sh` -- основной скрипт запуска
 - `run_samples.sh` -- скрипт для multi-sample (pass@k)
-- `.env` -- параметры модели (BASE_URL, API_KEY, MODEL)
+- `save_report.sh` -- сохранение отчёта в хранилище `~/workspace/data/cvdp-benchmark-runner/reports/`
+- `.env` -- параметры модели (BASE_URL, API_KEY, MODEL, MODEL_TIMEOUT)
 
 ## Как работает
 
