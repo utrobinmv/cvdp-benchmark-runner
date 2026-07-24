@@ -2,75 +2,47 @@
 
 ## Системные требования
 
-- Python 3.12 (рекомендуется)
-- Docker CE (для запуска тестовых харнесов)
+- Python 3.12
+- Docker CE
 - Git
 
-## Пошаговая установка
+## Установка
 
-### 1. Клонирование репозитория
+### 1. Клонирование и субмодуль
 
 ```bash
 git clone https://github.com/utrobinmv/cvdp-benchmark-runner.git
 cd cvdp-benchmark-runner
-```
-
-### 2. Инициализация субмодуля
-
-```bash
 git submodule update --init --recursive
 ```
 
-Проверьте, что субмодуль загружен:
+### 2. Python-окружение
 
 ```bash
-ls cvdp_benchmark/src/
-```
-
-### 3. Настройка Python-окружения
-
-```bash
-# Привязка версии Python через pyenv
 pyenv local 3.12
-
-# Создание виртуального окружения
 python -m venv ~/workspace/venvs/cvdp-benchmark-runner/default/
-
-# Активация
 source .venv
-
-# Установка зависимостей бенчмарка
 pip install -r cvdp_benchmark/requirements.txt
-
-# Установка зависимостей LLM-модуля
 pip install -r cvdp_benchmark/src/llm_lib/requirements.txt
 ```
 
-### 4. Настройка Docker
+### 3. Docker
 
 ```bash
-# Добавление пользователя в группу docker
 sudo usermod -aG docker $USER
-
-# Выход и повторный вход (или restart session)
-# Проверка:
+# Выйти и войти снова
 docker --version
 ```
 
-### 5. Исправление cocotb.sim_time_utils в датасетах (важно!)
-
-В оригинальном репозитории `docker/requirements.in` указывает `cocotb==2.0.1`, а в датасетах есть `from cocotb.sim_time_utils import get_sim_time` -- этот модуль удалён в cocotb 2.0. Без исправления часть тестов упадёт с `ModuleNotFoundError`.
-
-**Важно:** НЕ заменяйте `cocotb==2.0.1` на `cocotb==1.9.2` -- в 1.9.2 нет `cocotb_tools.runner`, который используют 273 из 314 тестов.
+### 4. Исправление cocotb.sim_time_utils в датасетах
 
 ```bash
-# Исправить cocotb.sim_time_utils -> cocotb.utils в датасетах
 for f in datasets/*.jsonl; do
     sed -i 's/cocotb\.sim_time_utils/cocotb.utils/g' "$f"
 done
 ```
 
-### 6. Сборка Docker-образа для симуляции
+### 5. Сборка Docker-образа
 
 ```bash
 cd cvdp_benchmark
@@ -78,97 +50,48 @@ docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .
 cd ..
 ```
 
-> **Если Docker build падает по хешам cocotb:** `uv pip compile` может сгенерировать хеши только для sdist. В этом случае добавьте wheel hash:
-> ```bash
-> pip download cocotb==2.0.1 --no-deps -d /tmp/cocotb_dl
-> sha256sum /tmp/cocotb_dl/cocotb-2.0.1-*.whl
-> # Добавьте полученный hash в docker/requirements.txt после строки cocotb==2.0.1
-> ```
-
-### 7. Настройка модели (файл .env)
-
-Скопируйте `.env.example` в `.env`:
+### 6. Настройка модели
 
 ```bash
 cp .env.example .env
 ```
 
-Файл `.env`:
+Отредактируйте `.env`:
 
 ```
 BASE_URL=http://192.168.45.10:30000/v1
 API_KEY=any_key
 MODEL=/mnt/extendet_data/models/Qwen3.6-27B-FP8
-# Таймаут ответа модели в секундах. По умолчанию 60 -- слишком мало для больших моделей.
-# Рекомендуется минимум 600 для моделей 27B+ и 300 для моделей 12B.
 MODEL_TIMEOUT=600
 ```
 
-Измените при необходимости. Файл `.env` попадает в `.gitignore` и не коммитится.
-
-**Важно:** `MODEL_TIMEOUT` задаётся только в `.env`. Передача через переменную окружения перед запуском (например `MODEL_TIMEOUT=1200 ./run_benchmark.sh`) не работает -- скрипт перезагружает `.env` и перезаписывает значение.
-
-### 8. Скачивание датасета
+### 7. Скачивание датасета
 
 ```bash
-# Установка huggingface_hub (если ещё не установлен)
 pip install huggingface_hub
-
-# Скачивание датасета (huggingface_hub >= 1.0)
 hf download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets
-
-# Для старых версий huggingface_hub (< 1.0)
-huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets
 ```
 
-Или скачайте вручную с [Hugging Face](https://huggingface.co/datasets/nvidia/cvdp-benchmark-dataset).
-
-### 9. Проверка (pre-check)
-
-Перед первым запуском прогоните скрипт проверки:
+### 8. Проверка
 
 ```bash
-# Только проверка зависимостей
 ./pre_check.sh
-
-# Проверка + тест на golden решении (без LLM)
 ./pre_check.sh --test
 ```
 
-Скрипт проверяет:
-- Git submodule загружен
-- Python 3.12 и venv
-- Все Python пакеты (openai, huggingface_hub)
-- Docker и Docker образ `nvidia/cvdp-sim:v1.0.0`
-- Версия cocotb в Docker (должна быть 2.0.1)
-- iVerilog и cocotb работают в Docker
-- Файл `.env` и обязательные переменные
-- Датасеты скачаны
-
-Флаг `--test` дополнительно компилирует и симулирует простой Verilog-модуль в Docker -- проверяет, что harness работает.
-
-## Повторное развёртывание с нуля
+## Повторное развёртывание
 
 ```bash
-# 1. Удалить старое окружение
 rm -rf ~/workspace/venvs/cvdp-benchmark-runner/
-
-# 2. Обновить субмодуль
 git submodule update --init --recursive
-
-# 3. Создать venv заново
 pyenv local 3.12
 python -m venv ~/workspace/venvs/cvdp-benchmark-runner/default/
 source .venv
 pip install -r cvdp_benchmark/requirements.txt
 pip install -r cvdp_benchmark/src/llm_lib/requirements.txt
-
-# 4. Исправить cocotb.sim_time_utils в датасетах
 for f in datasets/*.jsonl; do
     sed -i 's/cocotb\.sim_time_utils/cocotb.utils/g' "$f"
 done
-
-# 5. Пересобрать Docker-образ
 cd cvdp_benchmark
 docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .
 cd ..
