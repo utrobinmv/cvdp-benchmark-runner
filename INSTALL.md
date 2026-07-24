@@ -64,12 +64,14 @@ docker --version
 ```bash
 cd cvdp_benchmark
 
-# Заменить cocotb==2.0.1 на cocotb==1.9.2
+# Заменить cocotb==2.0.1 на cocotb==1.9.2 в requirements.in
 sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
 
-# Перегенерировать requirements.txt
-uv pip compile docker/requirements.in --generate-hashes -o docker/requirements.txt
+# Заменить cocotb==2.0.1 на cocotb==1.9.2 в requirements.txt
+sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.txt
 ```
+
+> **Примечание:** `uv` нужен только если вы пересобираете `requirements.txt` с нуля. Простого `sed` достаточно -- хэши в `requirements.txt` не меняются, меняется только версия.
 
 ### 6. Сборка Docker-образа для симуляции
 
@@ -117,12 +119,28 @@ huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --loc
 
 Или скачайте вручную с [Hugging Face](https://huggingface.co/datasets/nvidia/cvdp-benchmark-dataset).
 
-### 9. Проверка
+### 9. Проверка (pre-check)
+
+Перед первым запуском прогоните скрипт проверки:
 
 ```bash
-# Тестовый запуск (проверка подключения к модели)
-./run_benchmark.sh -f datasets/cvdp_v1.0.1_example_nonagentic_code_generation_no_commercial_with_solutions.jsonl -i cvdp_copilot_test_issue_0001
+# Только проверка зависимостей
+./pre_check.sh
+
+# Проверка + тест на golden решении (без LLM)
+./pre_check.sh --test
 ```
+
+Скрипт проверяет:
+- Git submodule загружен
+- Python 3.12 и venv
+- Все Python пакеты (openai, cocotb, pytest, huggingface_hub)
+- Docker и Docker образ `nvidia/cvdp-sim:v1.0.0`
+- Версия cocotb в Docker (должна быть 1.9.2)
+- Файл `.env` и обязательные переменные
+- Датасеты скачаны
+
+Флаг `--test` дополнительно прогоняет один тест на golden решении (без LLM) -- проверяет, что Docker и симуляция работают.
 
 ## Повторное развёртывание с нуля
 
@@ -143,7 +161,7 @@ pip install -r cvdp_benchmark/src/llm_lib/requirements.txt
 # 4. Исправить cocotb (если субмодуль обновился и вернул cocotb==2.0.1)
 cd cvdp_benchmark
 sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
-uv pip compile docker/requirements.in --generate-hashes -o docker/requirements.txt
+sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.txt
 
 # 5. Пересобрать Docker-образ
 docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .

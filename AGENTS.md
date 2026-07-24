@@ -7,7 +7,9 @@
 - `run_benchmark.sh` -- основной скрипт запуска
 - `run_samples.sh` -- скрипт для multi-sample (pass@k)
 - `save_report.sh` -- сохранение отчёта в хранилище `~/workspace/data/cvdp-benchmark-runner/reports/`
+- `pre_check.sh` -- pre-flight check (зависимости, Docker, cocotb, опционально тест без LLM)
 - `.env` -- параметры модели (BASE_URL, API_KEY, MODEL, MODEL_TIMEOUT)
+- `.env.example` -- шаблон .env
 
 ## Как работает
 

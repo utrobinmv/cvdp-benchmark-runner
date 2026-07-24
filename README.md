@@ -91,12 +91,14 @@ huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --loc
 
 ```
 cvdp-benchmark-runner/
-├── .env                      # Параметры модели (BASE_URL, API_KEY, MODEL)
+├── .env                      # Параметры модели (BASE_URL, API_KEY, MODEL, MODEL_TIMEOUT)
+├── .env.example              # Шаблон .env
 ├── .venv                     # Скрипт активации venv
 ├── custom_factory.py         # Кастомная ModelFactory для OpenAI-compatible API
 ├── run_benchmark.sh          # Скрипт запуска бенчмарка
 ├── run_samples.sh            # Скрипт запуска multi-sample (pass@k)
 ├── save_report.sh            # Сохранение отчёта в хранилище
+├── pre_check.sh              # Pre-flight check (зависимости, Docker, cocotb)
 ├── cvdp_benchmark/           # Git submodule -- оригинальный репозиторий
 ├── README.md
 ├── INSTALL.md
