@@ -57,7 +57,21 @@ sudo usermod -aG docker $USER
 docker --version
 ```
 
-### 5. Сборка Docker-образа для симуляции
+### 5. Исправление cocotb (важно!)
+
+В оригинальном репозитории `docker/requirements.in` указывает `cocotb==2.0.1`, но код тестов использует `cocotb.sim_time_utils`, который удалён в cocotb 2.0. Без исправления часть тестов упадёт с `ModuleNotFoundError`.
+
+```bash
+cd cvdp_benchmark
+
+# Заменить cocotb==2.0.1 на cocotb==1.9.2
+sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
+
+# Перегенерировать requirements.txt
+uv pip compile docker/requirements.in --generate-hashes -o docker/requirements.txt
+```
+
+### 6. Сборка Docker-образа для симуляции
 
 ```bash
 cd cvdp_benchmark
@@ -65,7 +79,7 @@ docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .
 cd ..
 ```
 
-### 6. Настройка модели (файл .env)
+### 7. Настройка модели (файл .env)
 
 Скопируйте `.env.example` в `.env`:
 
@@ -88,7 +102,7 @@ MODEL_TIMEOUT=600
 
 **Важно:** `MODEL_TIMEOUT` задаётся только в `.env`. Передача через переменную окружения перед запуском (например `MODEL_TIMEOUT=1200 ./run_benchmark.sh`) не работает -- скрипт перезагружает `.env` и перезаписывает значение.
 
-### 7. Скачивание датасета
+### 8. Скачивание датасета
 
 ```bash
 # Установка huggingface_hub (если ещё не установлен)
@@ -103,7 +117,7 @@ huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --loc
 
 Или скачайте вручную с [Hugging Face](https://huggingface.co/datasets/nvidia/cvdp-benchmark-dataset).
 
-### 8. Проверка
+### 9. Проверка
 
 ```bash
 # Тестовый запуск (проверка подключения к модели)
@@ -126,8 +140,12 @@ source .venv
 pip install -r cvdp_benchmark/requirements.txt
 pip install -r cvdp_benchmark/src/llm_lib/requirements.txt
 
-# 4. Пересобрать Docker-образ
+# 4. Исправить cocotb (если субмодуль обновился и вернул cocotb==2.0.1)
 cd cvdp_benchmark
+sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
+uv pip compile docker/requirements.in --generate-hashes -o docker/requirements.txt
+
+# 5. Пересобрать Docker-образ
 docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .
 cd ..
 ```
