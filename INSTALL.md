@@ -57,39 +57,18 @@ sudo usermod -aG docker $USER
 docker --version
 ```
 
-### 5. Исправление cocotb (важно!)
+### 5. Исправление cocotb.sim_time_utils в датасетах (важно!)
 
-В оригинальном репозитории `docker/requirements.in` указывает `cocotb==2.0.1`, но код тестов использует `cocotb.sim_time_utils`, который удалён в cocotb 2.0. Без исправления часть тестов упадёт с `ModuleNotFoundError`.
+В оригинальном репозитории `docker/requirements.in` указывает `cocotb==2.0.1`, а в датасетах есть `from cocotb.sim_time_utils import get_sim_time` -- этот модуль удалён в cocotb 2.0. Без исправления часть тестов упадёт с `ModuleNotFoundError`.
 
-**Вариант A -- с uv (рекомендуется):**
-
-```bash
-cd cvdp_benchmark
-
-# Заменить cocotb==2.0.1 на cocotb==1.9.2
-sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
-
-# Перегенерировать requirements.txt с правильными хешами
-uv pip compile docker/requirements.in --generate-hashes -o docker/requirements.txt
-```
-
-**Вариант B -- без uv (только sed):**
+**Важно:** НЕ заменяйте `cocotb==2.0.1` на `cocotb==1.9.2` -- в 1.9.2 нет `cocotb_tools.runner`, который используют 273 из 314 тестов.
 
 ```bash
-cd cvdp_benchmark
-
-# Заменить cocotb==2.0.1 на cocotb==1.9.2 в обоих файлах
-sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
-sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.txt
-
-# Удалить хеши из requirements.txt (они теперь не соответствуют версии)
-sed -i '/--hash=sha256/d' docker/requirements.txt
-sed -i '/^\\/d' docker/requirements.txt
+# Исправить cocotb.sim_time_utils -> cocotb.utils в датасетах
+for f in datasets/*.jsonl; do
+    sed -i 's/cocotb\.sim_time_utils/cocotb.utils/g' "$f"
+done
 ```
-
-Без `uv` хеши удаляются, поэтому `uv pip sync` внутри Docker установит пакет без проверки хешей. Это безопасно -- хеши нужны только для CI/CD.
-
-> **Примечание:** `uv` нужен только если вы пересобираете `requirements.txt` с нуля. Простого `sed` достаточно -- хэши в `requirements.txt` не меняются, меняется только версия.
 
 ### 6. Сборка Docker-образа для симуляции
 
@@ -98,6 +77,13 @@ cd cvdp_benchmark
 docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .
 cd ..
 ```
+
+> **Если Docker build падает по хешам cocotb:** `uv pip compile` может сгенерировать хеши только для sdist. В этом случае добавьте wheel hash:
+> ```bash
+> pip download cocotb==2.0.1 --no-deps -d /tmp/cocotb_dl
+> sha256sum /tmp/cocotb_dl/cocotb-2.0.1-*.whl
+> # Добавьте полученный hash в docker/requirements.txt после строки cocotb==2.0.1
+> ```
 
 ### 7. Настройка модели (файл .env)
 
@@ -154,7 +140,7 @@ huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --loc
 - Python 3.12 и venv
 - Все Python пакеты (openai, huggingface_hub)
 - Docker и Docker образ `nvidia/cvdp-sim:v1.0.0`
-- Версия cocotb в Docker (должна быть 1.9.2)
+- Версия cocotb в Docker (должна быть 2.0.1)
 - iVerilog и cocotb работают в Docker
 - Файл `.env` и обязательные переменные
 - Датасеты скачаны
@@ -177,14 +163,13 @@ source .venv
 pip install -r cvdp_benchmark/requirements.txt
 pip install -r cvdp_benchmark/src/llm_lib/requirements.txt
 
-# 4. Исправить cocotb (если субмодуль обновился и вернул cocotb==2.0.1)
-cd cvdp_benchmark
-sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
-sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.txt
-sed -i '/--hash=sha256/d' docker/requirements.txt
-sed -i '/^\\/d' docker/requirements.txt
+# 4. Исправить cocotb.sim_time_utils в датасетах
+for f in datasets/*.jsonl; do
+    sed -i 's/cocotb\.sim_time_utils/cocotb.utils/g' "$f"
+done
 
 # 5. Пересобрать Docker-образ
+cd cvdp_benchmark
 docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .
 cd ..
 ```

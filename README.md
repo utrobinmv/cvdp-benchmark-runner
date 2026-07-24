@@ -18,6 +18,8 @@ git submodule update --init
 
 ### 2. Установка зависимостей
 
+Подробная инструкция — [INSTALL.md](INSTALL.md).
+
 ```bash
 # Создание venv
 source .venv
@@ -27,7 +29,27 @@ pip install -r cvdp_benchmark/requirements.txt
 pip install -r cvdp_benchmark/src/llm_lib/requirements.txt
 ```
 
-### 3. Настройка модели
+### 3. Исправление cocotb.sim_time_utils (обязательно!)
+
+В датасетах используется `cocotb.sim_time_utils`, удалённый в cocotb 2.0. Без исправления часть тестов упадёт:
+
+```bash
+for f in datasets/*.jsonl; do
+    sed -i 's/cocotb\.sim_time_utils/cocotb.utils/g' "$f"
+done
+```
+
+> **Важно:** НЕ заменяйте `cocotb==2.0.1` на `cocotb==1.9.2` -- в 1.9.2 нет `cocotb_tools.runner`, который используют 273 из 314 тестов.
+
+### 4. Сборка Docker-образа
+
+```bash
+cd cvdp_benchmark
+docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .
+cd ..
+```
+
+### 5. Настройка модели
 
 Скопируйте `.env.example` в `.env` и измените параметры:
 
@@ -48,7 +70,7 @@ MODEL_TIMEOUT=600
 
 **Важно:** `MODEL_TIMEOUT` задаётся только в `.env`. Передача через переменную окружения перед запуском (например `MODEL_TIMEOUT=1200 ./run_benchmark.sh`) не работает -- скрипт перезагружает `.env` и перезаписывает значение.
 
-### 4. Скачивание датасета
+### 6. Скачивание датасета
 
 Датасет CVDP доступен на Hugging Face: [nvidia/cvdp-benchmark-dataset](https://huggingface.co/datasets/nvidia/cvdp-benchmark-dataset)
 
@@ -60,7 +82,14 @@ hf download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./data
 huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets
 ```
 
-### 5. Запуск
+### 7. Pre-flight check
+
+```bash
+./pre_check.sh          # Проверка зависимостей
+./pre_check.sh --test   # + тест на golden решении (без LLM)
+```
+
+### 8. Запуск
 
 ```bash
 # Полный бенчмарк (1 поток)
@@ -175,30 +204,18 @@ print(f'{s[\"model\"]:50s} easy={s[\"by_difficulty\"].get(\"easy\",{}).get(\"pas
 done
 ```
 
-### Результаты
+### Таблица результатов
 
-#### Сравнение моделей
+| Метрика | Qwen3.6-27B-FP8 | Gemma-4-31B-it-FP8 | Gemma-4-12B-it-qat-w4a16-ct |
+|---------|-----------------|---------------------|------------------------------|
+| Problem Pass Rate | **34.11%** (103/302) | 25.50% | 18.54% (56/302) |
+| Test Pass Rate | **38.42%** (131/341) | — | 22.58% (77/341) |
+| Easy Pass Rate | **47.53%** (77/162) | — | 25.93% (42/162) |
+| Medium Pass Rate | **18.57%** (26/140) | — | 10.00% (14/140) |
 
-| Метрика | Qwen3.6-27B-FP8 | Gemma-4-12B-it-qat-w4a16-ct |
-|---------|-----------------|-----------------------------|
-| Problem Pass Rate | **34.11%** (103/302) | 18.54% (56/302) |
-| Test Pass Rate | **38.42%** (131/341) | 22.58% (77/341) |
-| Easy Pass Rate | **47.53%** (77/162) | 25.93% (42/162) |
-| Medium Pass Rate | **18.57%** (26/140) | 10.00% (14/140) |
+**Вывод:** Qwen3.6-27B-FP8 значительно превосходит обе модели Gemma. Gemma-4-31B лучше Gemma-4-12B, но уступает Qwen3.6-27B.
 
-#### По категориям
-
-| Категория | Qwen3.6-27B-FP8 | Gemma-4-12B |
-|-----------|-----------------|-------------|
-| cid002 | **24.47%** | 10.64% |
-| cid003 | **37.18%** | 28.21% |
-| cid004 | **30.91%** | 21.82% |
-| cid007 | **37.50%** | 10.00% |
-| cid016 | **54.29%** | 22.86% |
-
-**Вывод:** Qwen3.6-27B-FP8 значительно превосходит Gemma-4-12B во всех категориях. Особенно сильная разница на задачах cid016 (54.29% против 22.86%) и cid007 (37.50% против 10.00%).
-
-#### Основные ошибки Qwen3.6-27B-FP8
+#### Основные ошибки моделей
 
 - **Синтаксические** -- неопределённые сигналы, дублирующиеся assign, ошибки модулей
 - **Логические** -- код компилируется, но симуляция показывает неправильные результаты
