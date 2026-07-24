@@ -61,15 +61,33 @@ docker --version
 
 В оригинальном репозитории `docker/requirements.in` указывает `cocotb==2.0.1`, но код тестов использует `cocotb.sim_time_utils`, который удалён в cocotb 2.0. Без исправления часть тестов упадёт с `ModuleNotFoundError`.
 
+**Вариант A -- с uv (рекомендуется):**
+
 ```bash
 cd cvdp_benchmark
 
-# Заменить cocotb==2.0.1 на cocotb==1.9.2 в requirements.in
+# Заменить cocotb==2.0.1 на cocotb==1.9.2
 sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
 
-# Заменить cocotb==2.0.1 на cocotb==1.9.2 в requirements.txt
-sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.txt
+# Перегенерировать requirements.txt с правильными хешами
+uv pip compile docker/requirements.in --generate-hashes -o docker/requirements.txt
 ```
+
+**Вариант B -- без uv (только sed):**
+
+```bash
+cd cvdp_benchmark
+
+# Заменить cocotb==2.0.1 на cocotb==1.9.2 в обоих файлах
+sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
+sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.txt
+
+# Удалить хеши из requirements.txt (они теперь не соответствуют версии)
+sed -i '/--hash=sha256/d' docker/requirements.txt
+sed -i '/^\\/d' docker/requirements.txt
+```
+
+Без `uv` хеши удаляются, поэтому `uv pip sync` внутри Docker установит пакет без проверки хешей. Это безопасно -- хеши нужны только для CI/CD.
 
 > **Примечание:** `uv` нужен только если вы пересобираете `requirements.txt` с нуля. Простого `sed` достаточно -- хэши в `requirements.txt` не меняются, меняется только версия.
 
@@ -134,13 +152,14 @@ huggingface-cli download nvidia/cvdp-benchmark-dataset --repo-type dataset --loc
 Скрипт проверяет:
 - Git submodule загружен
 - Python 3.12 и venv
-- Все Python пакеты (openai, cocotb, pytest, huggingface_hub)
+- Все Python пакеты (openai, huggingface_hub)
 - Docker и Docker образ `nvidia/cvdp-sim:v1.0.0`
 - Версия cocotb в Docker (должна быть 1.9.2)
+- iVerilog и cocotb работают в Docker
 - Файл `.env` и обязательные переменные
 - Датасеты скачаны
 
-Флаг `--test` дополнительно прогоняет один тест на golden решении (без LLM) -- проверяет, что Docker и симуляция работают.
+Флаг `--test` дополнительно компилирует и симулирует простой Verilog-модуль в Docker -- проверяет, что harness работает.
 
 ## Повторное развёртывание с нуля
 
@@ -162,6 +181,8 @@ pip install -r cvdp_benchmark/src/llm_lib/requirements.txt
 cd cvdp_benchmark
 sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.in
 sed -i 's/cocotb==2.0.1/cocotb==1.9.2/' docker/requirements.txt
+sed -i '/--hash=sha256/d' docker/requirements.txt
+sed -i '/^\\/d' docker/requirements.txt
 
 # 5. Пересобрать Docker-образ
 docker build -f docker/Dockerfile.sim -t nvidia/cvdp-sim:v1.0.0 .

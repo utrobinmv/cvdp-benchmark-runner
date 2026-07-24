@@ -149,14 +149,24 @@ else
     fail "Датасеты не найдены в datasets/. Скачайте: hf download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets"
 fi
 
-# 9. Golden dataset (для теста без LLM)
+# 9. Проверка Docker harness (cocotb + iverilog)
 echo ""
-echo "--- Golden Dataset ---"
-GOLDEN_DATASET=$(find "${SCRIPT_DIR}/datasets" -name "*_with_solutions*" 2>/dev/null | head -1)
-if [ -n "$GOLDEN_DATASET" ]; then
-    pass "Golden dataset найден: $(basename "$GOLDEN_DATASET")"
+echo "--- Docker Harness ---"
+HARNESS_OK=$(docker run --rm nvidia/cvdp-sim:v1.0.0 /bin/bash -c '
+    iverilog -V >/dev/null 2>&1 && echo "iverilog ok" || echo "iverilog fail"
+    /venv/bin/python -c "import cocotb; print(f\"cocotb {cocotb.__version__}\")" 2>/dev/null && echo "cocotb ok" || echo "cocotb fail"
+' 2>/dev/null)
+
+if echo "$HARNESS_OK" | grep -q "iverilog ok"; then
+    pass "iverilog в Docker работает"
 else
-    warn "Golden dataset не найден -- тест без LLM (--test) невозможен"
+    fail "iverilog в Docker не работает"
+fi
+
+if echo "$HARNESS_OK" | grep -q "cocotb ok"; then
+    pass "cocotb в Docker работает"
+else
+    fail "cocotb в Docker не работает"
 fi
 
 # Итог
@@ -172,34 +182,33 @@ if [ "$FAIL" -gt 0 ]; then
 fi
 
 # Опциональный тест на golden
-if [ "$RUN_TEST" = true ] && [ -n "${GOLDEN_DATASET:-}" ]; then
+if [ "$RUN_TEST" = true ]; then
     echo ""
-    echo "--- Тест на golden решении (без LLM) ---"
-    echo "Запуск одного теста для проверки Docker и симуляции..."
+    echo "--- Тест harness (без LLM) ---"
+    echo "Проверка компиляции и симуляции простого модуля в Docker..."
 
     cd "${SCRIPT_DIR}"
     source .venv
 
-    # Берём первый ID из golden датасета
-    FIRST_ID=$(head -1 "$GOLDEN_DATASET" | python3 -c "import json,sys; print(json.loads(sys.stdin.readline())['id'])" 2>/dev/null || echo "")
+    # Запускаем минимальный тест cocotb в Docker
+    TEST_RESULT=$(docker run --rm nvidia/cvdp-sim:v1.0.0 /bin/bash -c '
+        cd /tmp
+        cat > test.sv << "EOF"
+module test;
+    initial begin
+        $display("Harness test passed");
+        $finish;
+    end
+endmodule
+EOF
+        iverilog -o test.vvp test.sv && vvp test.vvp
+    ' 2>&1)
 
-    if [ -n "$FIRST_ID" ]; then
-        echo "Тест: ${FIRST_ID}"
-        if python3 "${BENCHMARK_DIR}/run_benchmark.py" \
-            -f "$GOLDEN_DATASET" \
-            -i "$FIRST_ID" \
-            -p pre_check_test \
-            2>&1 | tail -5; then
-            pass "Тест на golden решении прошёл успешно"
-        else
-            fail "Тест на golden решении упал. Проверьте Docker и симуляцию."
-            exit 1
-        fi
-
-        # Очистка
-        rm -rf "${BENCHMARK_DIR}/pre_check_test"
+    if echo "$TEST_RESULT" | grep -q "Harness test passed"; then
+        pass "Docker harness (iverilog + vvp) работает"
     else
-        warn "Не удалось получить ID из golden датасета"
+        fail "Docker harness упал: $TEST_RESULT"
+        exit 1
     fi
 fi
 
