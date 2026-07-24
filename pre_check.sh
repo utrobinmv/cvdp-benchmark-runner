@@ -100,10 +100,10 @@ fi
 echo ""
 echo "--- cocotb Version ---"
 COCOTB_VER=$(docker run --rm nvidia/cvdp-sim:v1.0.0 /venv/bin/python -c "import cocotb; print(cocotb.__version__)" 2>/dev/null || echo "unknown")
-if [ "$COCOTB_VER" = "1.9.2" ]; then
+if [ "$COCOTB_VER" = "2.0.1" ]; then
     pass "cocotb в Docker: $COCOTB_VER (верно)"
-elif [ "$COCOTB_VER" = "2.0.1" ]; then
-    fail "cocotb в Docker: $COCOTB_VER -- нужно исправить на 1.9.2 (см. INSTALL.md шаг 5)"
+elif [ "$COCOTB_VER" = "1.9.2" ]; then
+    fail "cocotb в Docker: $COCOTB_VER -- нужно cocotb==2.0.1 (cocotb_tools.runner отсутствует в 1.9.2)"
 else
     warn "cocotb в Docker: $COCOTB_VER (неизвестная версия)"
 fi
