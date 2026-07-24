@@ -66,7 +66,7 @@ fi
 # 4. Python packages
 echo ""
 echo "--- Python Packages ---"
-PACKAGES="openai cocotb pytest huggingface_hub"
+PACKAGES="openai huggingface_hub"
 for pkg in $PACKAGES; do
     if python3 -c "import ${pkg//-/_}" 2>/dev/null; then
         ver=$(python3 -c "import ${pkg//-/_}; print(${pkg//-/_}.__version__)" 2>/dev/null || echo "?")
@@ -75,6 +75,8 @@ for pkg in $PACKAGES; do
         fail "${pkg} не установлен"
     fi
 done
+
+# cocotb и pytest нужны только внутри Docker -- проверяем там (см. ниже)
 
 # 5. Docker
 echo ""
@@ -147,14 +149,14 @@ else
     fail "Датасеты не найдены в datasets/. Скачайте: hf download nvidia/cvdp-benchmark-dataset --repo-type dataset --local-dir ./datasets"
 fi
 
-# 10. Golden dataset (для теста без LLM)
+# 9. Golden dataset (для теста без LLM)
 echo ""
 echo "--- Golden Dataset ---"
-GOLDEN_DATASET=$(find "${SCRIPT_DIR}/datasets" -name "*with_solutions*" -o -name "*_agentic_*_commercial*" 2>/dev/null | head -1)
+GOLDEN_DATASET=$(find "${SCRIPT_DIR}/datasets" -name "*_with_solutions*" 2>/dev/null | head -1)
 if [ -n "$GOLDEN_DATASET" ]; then
     pass "Golden dataset найден: $(basename "$GOLDEN_DATASET")"
 else
-    warn "Golden dataset не найден -- тест без LLM невозможен"
+    warn "Golden dataset не найден -- тест без LLM (--test) невозможен"
 fi
 
 # Итог
